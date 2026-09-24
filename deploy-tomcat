@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -13,20 +14,41 @@ pipeline {
         stage('Maven Clean Package') {
             steps {
                 sh 'mvn clean package'
+
+                sh '''
+                    echo "WAR files generated:"
+                    ls -lh webapp/target/*.war
+                '''
             }
         }
 
         stage('Deploy WAR to Tomcat') {
             steps {
-                sshagent(['tomcat-ssh']) {
-                    sh '''
-                        echo "Deploying WAR to Tomcat..."
 
-                        scp target/*.war root@TOMCAT_SERVER_IP:/root/tomcat/webapps/
+                echo 'Deploying WAR to Tomcat...'
 
-                        echo "WAR deployed successfully!"
-                    '''
-                }
+                sshPublisher(
+                    publishers: [
+                        sshPublisherDesc(
+                            configName: 'tomcat-server',
+
+                            transfers: [
+                                sshTransfer(
+                                    sourceFiles: 'webapp/target/*.war',
+                                    removePrefix: 'webapp/target',
+                                    remoteDirectory: '/root/tomcat/webapps',
+                                    flatten: true,
+                                    cleanRemote: false,
+                                    makeEmptyDirs: false
+                                )
+                            ],
+
+                            verbose: true
+                        )
+                    ]
+                )
+
+                echo 'WAR deployment completed!'
             }
         }
     }
